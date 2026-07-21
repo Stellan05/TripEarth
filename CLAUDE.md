@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
+
+> **重要：每次开始新会话时，先阅读 `docs/HANDOVER.md` 获取当前项目进度。**
 
 # project
 这是一个 Vibe Coding 项目。
