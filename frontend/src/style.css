@@ -1,0 +1,644 @@
+/* ================================================================
+   Travel Atlas — Design Token 全局样式
+   视觉方向：Polarsteps × Apple Maps × Flighty
+   规范来源：design.md
+   ================================================================ */
+
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ================================================================
+   1. CSS 变量（Design Tokens）
+   ================================================================ */
+
+:root {
+  /* --- 背景 --- */
+  --color-page:        #F5F2ED;
+  --color-card:        #FFFFFF;
+  --color-card-hover:  #FAFAFA;
+  --color-sheet:       #FBF9F6;
+
+  /* --- 文字 --- */
+  --text-primary:      #1C1E22;
+  --text-secondary:    #6B6E77;
+  --text-tertiary:     #999CA6;
+  --text-inverse:      #FFFFFF;
+
+  /* --- 强调色 --- */
+  --color-sunset:      #E8714A;
+  --color-sunset-glow: #F0A080;
+  --color-ocean:       #3B7EC7;
+  --color-ocean-deep:  #2A5F9A;
+  --color-forest:      #4A9C7C;
+  --color-forest-light:#6DBA9A;
+
+  /* --- 地图 --- */
+  --map-land:          #F0E8D8;
+  --map-land-visited:  #E8C9A0;
+  --map-land-wishlist: #C5D8C0;
+  --map-water:         #E8EDF2;
+  --map-water-dark:    #D0D8E3;
+
+  /* --- 航班卡片 --- */
+  --flight-accent:     #4468B2;
+  --flight-divider:    #E8E8EC;
+
+  /* --- 语义色 --- */
+  --color-danger:      #D94848;
+  --color-warning:     #E8993A;
+  --color-success:     #4A9C7C;
+  --color-info:        #3B7EC7;
+
+  /* --- 阴影 --- */
+  --shadow-card:       0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-modal:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --shadow-max:        0 16px 48px rgba(0, 0, 0, 0.14);
+
+  /* --- 圆角 --- */
+  --radius-sm:   8px;
+  --radius-md:  14px;
+  --radius-lg:  20px;
+  --radius-xl:  28px;
+  --radius-full: 9999px;
+
+  /* --- 间距 --- */
+  --space-xs:   4px;
+  --space-sm:   8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* --- 布局 --- */
+  --page-padding:      32px;
+  --card-padding:      20px;
+  --card-gap:          20px;
+  --photo-grid-gap:     8px;
+  --section-gap:       48px;
+  --content-max-width: 1280px;
+
+  /* --- 字体族 --- */
+  --font-display: 'Newsreader', serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
+
+  /* --- 字号 --- */
+  --text-display-xl: 56px;
+  --text-display-lg: 40px;
+  --text-display-md: 32px;
+  --text-display-sm: 24px;
+  --text-body-xl:    20px;
+  --text-body-lg:    18px;
+  --text-body-md:    16px;
+  --text-body-sm:    14px;
+  --text-body-xs:    12px;
+  --text-mono-lg:    20px;
+  --text-mono-md:    16px;
+  --text-mono-sm:    14px;
+
+  /* --- 缓动 --- */
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out:     cubic-bezier(0, 0, 0.2, 1);
+  --ease-in:      cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring:  cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-globe:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* --- 字重 --- */
+  --font-weight-light:  300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* --- 行高 --- */
+  --leading-tight:  1.1;
+  --leading-snug:   1.15;
+  --leading-normal: 1.3;
+  --leading-relaxed: 1.45;
+  --leading-loose:  1.5;
+
+  /* --- 字间距 --- */
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.02em;
+
+  /* --- 透明度 --- */
+  --opacity-disabled: 0.5;
+  --opacity-muted:    0.3;
+
+  /* --- Z-Index 层级 --- */
+  --z-base:      0;
+  --z-dropdown:  100;
+  --z-sticky:    200;
+  --z-fixed:     300;
+  --z-overlay:   400;
+  --z-modal:     500;
+  --z-tooltip:   600;
+  --z-toast:     700;
+  --z-max:       999;
+
+  /* --- 过渡时长 --- */
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   350ms;
+  --duration-globe:  800ms;
+
+  /* --- 基准 --- */
+  color-scheme: light;
+  font-family: var(--font-body);
+  font-size: var(--text-body-md);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-loose);
+  color: var(--text-primary);
+  background-color: var(--color-page);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ================================================================
+   2. 深色主题
+   ================================================================ */
+
+[data-theme="dark"] {
+  --color-page:        #1C1E22;
+  --color-card:        #262830;
+  --color-card-hover:  #2E303A;
+  --color-sheet:       #22242A;
+
+  --text-primary:      #EBEBED;
+  --text-secondary:    #9B9DA5;
+  --text-tertiary:     #6B6D75;
+
+  --color-sunset:      #F08060;
+  --color-sunset-glow: #F5B090;
+  --color-ocean:       #5B9ED8;
+  --color-ocean-deep:  #7AB8E8;
+  --color-forest:      #5DBA90;
+  --color-forest-light:#80D0AB;
+
+  --map-land-visited:  #C89870;
+  --map-land-wishlist: #90A890;
+  --map-water:         #2A3040;
+  --map-water-dark:    #222838;
+
+  --shadow-card:       0 1px 3px rgba(0, 0, 0, 0.30);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-modal:      0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-max:        0 16px 48px rgba(0, 0, 0, 0.60);
+
+  --flight-divider:    #363840;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-page:        #1C1E22;
+    --color-card:        #262830;
+    --color-card-hover:  #2E303A;
+    --color-sheet:       #22242A;
+
+    --text-primary:      #EBEBED;
+    --text-secondary:    #9B9DA5;
+    --text-tertiary:     #6B6D75;
+
+    --color-sunset:      #F08060;
+    --color-sunset-glow: #F5B090;
+    --color-ocean:       #5B9ED8;
+    --color-ocean-deep:  #7AB8E8;
+    --color-forest:      #5DBA90;
+    --color-forest-light:#80D0AB;
+
+    --map-land-visited:  #C89870;
+    --map-land-wishlist: #90A890;
+    --map-water:         #2A3040;
+    --map-water-dark:    #222838;
+
+    --shadow-card:       0 1px 3px rgba(0, 0, 0, 0.30);
+    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.40);
+    --shadow-modal:      0 8px 24px rgba(0, 0, 0, 0.50);
+    --shadow-max:        0 16px 48px rgba(0, 0, 0, 0.60);
+
+    --flight-divider:    #363840;
+
+    color-scheme: dark;
+  }
+}
+
+/* ================================================================
+   3. 全局 Reset & 基础
+   ================================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--color-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-body-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-ocean);
+  text-decoration: none;
+  transition: color 150ms var(--ease-default);
+}
+
+a:hover {
+  color: var(--color-ocean-deep);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* ================================================================
+   4. 排版
+   ================================================================ */
+
+.display-xl {
+  font-family: var(--font-display);
+  font-size: var(--text-display-xl);
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.display-lg {
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  line-height: 1.15;
+  font-weight: 500;
+}
+
+.display-md {
+  font-family: var(--font-display);
+  font-size: var(--text-display-md);
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.display-sm {
+  font-family: var(--font-display);
+  font-size: var(--text-display-sm);
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.body-xl {
+  font-family: var(--font-body);
+  font-size: var(--text-body-xl);
+  line-height: 1.5;
+}
+
+.body-lg {
+  font-family: var(--font-body);
+  font-size: var(--text-body-lg);
+  line-height: 1.5;
+}
+
+.body-md {
+  font-family: var(--font-body);
+  font-size: var(--text-body-md);
+  line-height: 1.5;
+}
+
+.body-sm {
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm);
+  line-height: 1.45;
+}
+
+.body-xs {
+  font-family: var(--font-body);
+  font-size: var(--text-body-xs);
+  line-height: 1.4;
+}
+
+.mono-lg {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-lg);
+  line-height: 1.3;
+}
+
+.mono-md {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-md);
+  line-height: 1.3;
+}
+
+.mono-sm {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono-sm);
+  line-height: 1.3;
+}
+
+.text-primary    { color: var(--text-primary); }
+.text-secondary  { color: var(--text-secondary); }
+.text-tertiary   { color: var(--text-tertiary); }
+.text-sunset     { color: var(--color-sunset); }
+.text-ocean      { color: var(--color-ocean); }
+.text-forest     { color: var(--color-forest); }
+
+/* ================================================================
+   5. 卡片
+   ================================================================ */
+
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  padding: var(--card-padding);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: box-shadow 200ms var(--ease-default),
+              transform 200ms var(--ease-default);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+/* ================================================================
+   6. 按钮
+   ================================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  transition: all 150ms var(--ease-default);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--color-sunset);
+  color: var(--text-inverse);
+}
+
+.btn-primary:hover {
+  background: var(--color-sunset-glow);
+  box-shadow: 0 2px 8px rgba(232, 113, 74, 0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:hover {
+  background: var(--color-card-hover);
+  color: var(--text-primary);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background: var(--color-card-hover);
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--text-inverse);
+}
+
+.btn-danger:hover {
+  background: #c43e3e;
+}
+
+.btn-sm { padding: 6px 14px; font-size: var(--text-body-xs); }
+.btn-lg { padding: 14px 28px; font-size: var(--text-body-md); }
+
+/* ================================================================
+   7. Pill（标签/筛选器）
+   ================================================================ */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  background: var(--color-card);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: var(--text-secondary);
+  transition: all 150ms var(--ease-default);
+}
+
+.pill:hover {
+  color: var(--text-primary);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.pill-active {
+  background: var(--color-sunset);
+  color: var(--text-inverse);
+  border-color: var(--color-sunset);
+}
+
+.pill-active:hover {
+  color: var(--text-inverse);
+  background: var(--color-sunset-glow);
+}
+
+/* ================================================================
+   8. 导航 Pill
+   ================================================================ */
+
+.nav-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 8px 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* ================================================================
+   9. 页面布局
+   ================================================================ */
+
+.page {
+  min-height: 100vh;
+  padding: var(--page-padding);
+}
+
+.page-header {
+  margin-bottom: var(--space-xl);
+}
+
+.page-section {
+  margin-bottom: var(--section-gap);
+}
+
+/* ================================================================
+   10. 工具类
+   ================================================================ */
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gap-xs { gap: var(--space-xs); }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }
+
+/* ================================================================
+   11. Element Plus 主题覆盖
+   ================================================================ */
+
+/* 覆盖 Element Plus 主色为日落橙 */
+:root {
+  --el-color-primary: var(--color-sunset);
+  --el-color-primary-light-3: var(--color-sunset-glow);
+  --el-color-primary-dark-2: #d46540;
+  --el-font-family: var(--font-body);
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-round: var(--radius-full);
+}
+
+/* ================================================================
+   12. 全局动画 @keyframes
+   ================================================================ */
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* ================================================================
+   13. 动画 Utility Classes
+   ================================================================ */
+
+.animate-fade-in-up {
+  animation: fade-in-up var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-fade-in-down {
+  animation: fade-in-down var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-fade-in {
+  animation: fade-in var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left var(--duration-normal) var(--ease-out) both;
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-slow) var(--ease-spring) both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 1.5s var(--ease-default) infinite;
+}
+
+/* Stagger helper — 配合 useStagger composable 使用 */
+.stagger-item {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.stagger-item.visible {
+  animation: fade-in-up var(--duration-normal) var(--ease-out) both;
+}
+
+/* ================================================================
+   14. 滚动条
+   ================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
