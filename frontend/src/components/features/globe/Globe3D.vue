@@ -2,12 +2,12 @@
  * Globe3D — 全屏交互式 3D 地球
  *
  * 渲染策略：
- *   - 所有国家多边形填充透明，地球纹理完整可见
- *   - 去过国家 → Sunset Orange 轮廓
- *   - 想去国家 → 灰绿轮廓
- *   - 未去过国家 → 极淡灰色轮廓
- *   - 用户所在国 → 灰色填充覆盖
- *   - Hover → 该国轮廓高亮 + 显示国名
+ *   - 去过国家 → 暖金色填充(78% opacity) + Sunset Orange 轮廓
+ *   - 想去国家 → 鼠尾草绿填充(55% opacity) + 柔和绿轮廓
+ *   - 用户所在国 → 陶土色填充(85% opacity) 覆盖
+ *   - 未去过国家 → 极淡灰色轮廓，无填充
+ *   - Hover 国家 → 轮廓加亮 + tooltip 国名
+ *   - Click 仅去过/想去国家有效（未去国家不跳转）
  *
  * 一个中国原则：台湾（TWN）映射为 CHN。
  */
@@ -18,6 +18,8 @@ import type { CountryStatus } from '@/types/country'
 const props = defineProps<{
   countryStatuses: CountryStatus[]
   loading?: boolean
+  /** 递增时触发已去国家脉冲闪烁 */
+  pulseTrigger?: number
 }>()
 
 const emit = defineEmits<{
@@ -32,6 +34,9 @@ const loadError = ref<string | null>(null)
 
 let globe: ReturnType<typeof import('globe.gl').default> | null = null
 let ready = false
+let destroyed = false
+let pulseTimer: ReturnType<typeof setTimeout> | null = null
+let pulsePhase = 0 // 0 = 正常, 1 = 脉冲亮, 2 = 脉冲暗
 
 // ===== 状态索引 =====
 const statusIdx = ref<Record<string, CountryStatus>>({})
@@ -45,24 +50,94 @@ watch(
 function norm(iso: string): string { return iso.toUpperCase() === 'TWN' ? 'CHN' : iso }
 function gs(iso: string): CountryStatus | undefined { return statusIdx.value[norm(iso).toLowerCase()] }
 
+// ===== 脉冲闪烁状态 =====
+let pulseActive = false
+let pulseBrightness = 0 // 0~1
+
+type _GF = { properties: { ISO_A3: string; NAME: string } }
+
+function pulseVisitedCountries(g: ReturnType<typeof import('globe.gl').default>) {
+  if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = null }
+  pulseActive = true
+  pulseBrightness = 1
+
+  // 强制更新颜色
+  g.polygonStrokeColor((ff: unknown) => strokeColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+  g.polygonCapColor((ff: unknown) => fillColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+
+  // 3 次脉冲（亮→暗→亮→暗→亮→正常），每次 200ms
+  const steps = [1, 0.2, 1, 0.2, 1, 0]
+  let stepIdx = 0
+  function tick() {
+    if (stepIdx >= steps.length) {
+      pulseActive = false
+      pulseBrightness = 0
+      g.polygonStrokeColor((ff: unknown) => strokeColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+      g.polygonCapColor((ff: unknown) => fillColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+      return
+    }
+    pulseBrightness = steps[stepIdx]
+    stepIdx++
+    g.polygonStrokeColor((ff: unknown) => strokeColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+    g.polygonCapColor((ff: unknown) => fillColor(((ff as _GF).properties || {}).ISO_A3 || ''))
+    pulseTimer = setTimeout(tick, 200)
+  }
+  tick()
+}
+
 // ===== 轮廓色 =====
 let hoveredCode: string | null = null
+
+// 安全守卫：globe 已销毁时返回默认值，防止 HMR 回调崩溃
+function safe(): boolean { return !!globe && ready && !destroyed }
 
 function strokeColor(iso: string): string {
   const s = gs(iso)
   const isHovered = hoveredCode && norm(iso).toLowerCase() === hoveredCode.toLowerCase()
 
-  if (isHovered) return '#F08050'
+  // Hover 态 — 所有国家都显示高亮
+  if (isHovered) {
+    if (s?.status === 'visited' || s?.isHome) return '#F08050'
+    if (s?.status === 'wishlist') return '#A0D0A0'
+    return 'rgba(200, 195, 185, 0.5)'
+  }
 
-  if (s && (s.status === 'visited' || s.isHome)) return '#E8714A'
-  if (s && s.status === 'wishlist') return 'rgba(140, 180, 150, 0.5)'
+  if (s && (s.status === 'visited' || s.isHome)) {
+    if (pulseActive && pulseBrightness > 0) {
+      const r = Math.round(232 + (255 - 232) * pulseBrightness * 0.5)
+      const g = Math.round(113 + (255 - 113) * pulseBrightness * 0.5)
+      const b = Math.round(74 + (255 - 74) * pulseBrightness * 0.5)
+      return `rgba(${r}, ${g}, ${b}, ${0.6 + pulseBrightness * 0.4})`
+    }
+    return '#E8714A'
+  }
+  if (s && s.status === 'wishlist') return 'rgba(140, 180, 150, 0.8)'
   return 'rgba(180, 175, 165, 0.15)'
 }
 
-// ===== 填充色 — 仅用户所在国用灰色覆盖 =====
+// ===== 填充色 — 美丽半透明填充区分国家状态 =====
 function fillColor(iso: string): string {
   const s = gs(iso)
-  if (s && s.isHome) return 'rgba(210, 205, 200, 0.5)'
+  if (!s) return 'rgba(0,0,0,0)' // 未去过 → 透明
+
+  // 用户所在国优先（即使它也在 visited 里）
+  if (s.isHome) return 'rgba(219, 215, 215, 0.85)' // 优雅中性灰
+
+  if (s.status === 'visited') {
+    const intensity = Math.min(s.visitCount || 1, 8) / 8
+    const alpha = 0.45 + intensity * 0.35 // 0.45 ~ 0.80
+    // 脉冲时提亮 + 提高透明度
+    if (pulseActive && pulseBrightness > 0) {
+      const brightR = Math.round(213 + (255 - 213) * pulseBrightness * 0.3)
+      const brightG = Math.round(169 + (255 - 169) * pulseBrightness * 0.3)
+      const brightB = Math.round(106 + (255 - 106) * pulseBrightness * 0.3)
+      return `rgba(${brightR}, ${brightG}, ${brightB}, ${Math.min(alpha + 0.15, 0.9)})`
+    }
+    return `rgba(213, 169, 106, ${alpha})` // 暖金色
+  }
+
+  if (s.status === 'wishlist') return 'rgba(139, 175, 149, 0.55)' // 鼠尾草绿
+
   return 'rgba(0,0,0,0)'
 }
 
@@ -113,7 +188,14 @@ async function init() {
       .onPolygonClick((f: unknown) => {
         const iso = ((f as GF).properties || {}).ISO_A3 || ''
         if (!iso) return
-        emit('country-click', norm(iso), gs(iso) ?? null)
+        const status = gs(iso)
+        // 仅去过/想去国家可点击，未去国家无响应
+        if (!status || (status.status !== 'visited' && status.status !== 'wishlist' && !status.isHome)) return
+        // 点击去过国家 → 触发所有去过国家脉冲闪烁
+        if (status.status === 'visited' || status.isHome) {
+          pulseVisitedCountries(g)
+        }
+        emit('country-click', norm(iso), status)
       })
 
     g.controls().autoRotate = true
@@ -146,19 +228,29 @@ watch(
   () => props.countryStatuses,
   () => {
     if (!globe || !ready) return
-    globe.polygonStrokeColor((f: unknown) =>
-      strokeColor(((f as { properties: { ISO_A3: string } }).properties || {}).ISO_A3 || ''),
-    )
-    globe.polygonCapColor((f: unknown) =>
-      fillColor(((f as { properties: { ISO_A3: string } }).properties || {}).ISO_A3 || ''),
-    )
+    try {
+      globe.polygonStrokeColor((f: unknown) =>
+        strokeColor(((f as { properties: { ISO_A3: string } }).properties || {}).ISO_A3 || ''),
+      )
+      globe.polygonCapColor((f: unknown) =>
+        fillColor(((f as { properties: { ISO_A3: string } }).properties || {}).ISO_A3 || ''),
+      )
+    } catch { /* globe may be disposed during navigation */ }
   },
   { deep: true },
 )
 
+// 外部触发脉冲（统计面板点击已去国家触发）
+watch(() => props.pulseTrigger, () => {
+  if (globe && ready && !destroyed) {
+    pulseVisitedCountries(globe as unknown as ReturnType<typeof import('globe.gl').default>)
+  }
+})
+
 onMounted(init)
 
 onBeforeUnmount(() => {
+  if (pulseTimer) clearTimeout(pulseTimer)
   if (globe) {
     try {
       const sc = (globe as unknown as { scene?: () => { traverse: (fn: (c: unknown) => void) => void } }).scene

@@ -42,18 +42,19 @@ This file provides guidance to Claude Code when working with code in this reposi
 - 不允许重复实现已有组件。
 - 每完成一个模块，先进行自检（类型、命名、可复用性、性能、规范），确认无问题后再继续。
 - 如果发现设计稿、开发规范或开发计划之间存在冲突，暂停编码并提出问题，不要自行决定。
-
-You are a senior full-stack software engineer and architect.
-
-Your goals are:
-
-- Write production-ready code.
-- Prefer maintainability over quick hacks.
-- Think before implementing.
-- Explain important architectural decisions when necessary.
+- 只有当我发出上传指令才进行git相关操作。
 
 ---
+## Development Workflow
 
+默认开发模式：
+
+1. 阅读 IMPLEMENTATION_PLAN.md。
+2. 仅执行用户指定的 Phase。
+3. 不允许开发未来 Phase。
+4. 严格满足该 Phase 的 Acceptance Criteria。
+5. 完成后执行 Self Review。
+6. 未收到新的指令，不进入下一 Phase。
 # Default Tech Stack
 
 Backend

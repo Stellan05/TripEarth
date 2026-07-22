@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import StatsPanel from '@/components/features/trip/StatsPanel.vue'
 import TripMiniCard from '@/components/features/trip/TripMiniCard.vue'
@@ -9,59 +9,91 @@ import AppIcon from '@/components/base/AppIcon.vue'
 import AppDivider from '@/components/base/AppDivider.vue'
 import Globe3D from '@/components/features/globe/Globe3D.vue'
 import { useI18n } from '@/composables/useI18n'
-import { daysBetween } from '@/utils/date'
-import type { Trip } from '@/types/trip'
+import { useCountryStore } from '@/stores/countryStore'
+import { useTripStore } from '@/stores/tripStore'
+import * as statsApi from '@/api/stats'
 import type { CountryStatus } from '@/types/country'
 
 const router = useRouter()
 const { t } = useI18n()
+const countryStore = useCountryStore()
+const tripStore = useTripStore()
 
 const loading = ref(true)
 const welcomeVisible = ref(false)
 const welcomeLeaving = ref(false)
+const stats = ref({ countryCount: 0, cityCount: 0, tripCount: 0, flightCount: 0, continentCount: 0 })
+const statsHighlight = ref(false)
+const statsHighlightWishlist = ref(false)
+const pulseTrigger = ref(0)
 
-const mockTrips: Trip[] = [
-  { id: 1, countryCode: 'FRA', countryName: 'France', flagEmoji: '🇫🇷', cityName: 'Paris', startDate: '2024-10-12', endDate: '2024-10-19', dayCount: daysBetween('2024-10-12', '2024-10-19'), cityCount: 3 },
-  { id: 2, countryCode: 'JPN', countryName: 'Japan', flagEmoji: '🇯🇵', cityName: 'Tokyo', startDate: '2025-03-15', endDate: '2025-03-22', dayCount: daysBetween('2025-03-15', '2025-03-22'), cityCount: 2 },
-  { id: 3, countryCode: 'ITA', countryName: 'Italy', flagEmoji: '🇮🇹', cityName: 'Rome', startDate: '2024-07-05', endDate: '2024-07-10', dayCount: daysBetween('2024-07-05', '2024-07-10'), cityCount: 2 },
-  { id: 4, countryCode: 'THA', countryName: 'Thailand', flagEmoji: '🇹🇭', cityName: 'Bangkok', startDate: '2024-03-08', endDate: '2024-03-15', dayCount: daysBetween('2024-03-08', '2024-03-15'), cityCount: 3 },
-  { id: 5, countryCode: 'ESP', countryName: 'Spain', flagEmoji: '🇪🇸', cityName: 'Barcelona', startDate: '2023-08-10', endDate: '2023-08-16', dayCount: daysBetween('2023-08-10', '2023-08-16'), cityCount: 2 },
-  { id: 6, countryCode: 'KOR', countryName: 'South Korea', flagEmoji: '🇰🇷', cityName: 'Seoul', startDate: '2023-05-01', endDate: '2023-05-05', dayCount: daysBetween('2023-05-01', '2023-05-05'), cityCount: 1 },
-]
+const allStatuses = computed<CountryStatus[]>(() => {
+  try {
+    return [
+      ...(countryStore.visitedCountries || []),
+      ...(countryStore.wishlistCountries || []),
+    ]
+  } catch { return [] }
+})
 
-const mockVisitedCountries: CountryStatus[] = [
-  { code: 'FRA', name: 'France',       status: 'visited', visitCount: 3, lastVisit: '2024-10-12', heartCount: 2, hasNotes: true },
-  { code: 'JPN', name: 'Japan',        status: 'visited', visitCount: 5, lastVisit: '2025-03-15', heartCount: 3, hasNotes: true },
-  { code: 'ITA', name: 'Italy',        status: 'visited', visitCount: 2, lastVisit: '2024-07-05', hasNotes: true },
-  { code: 'THA', name: 'Thailand',     status: 'visited', visitCount: 1, lastVisit: '2024-03-08' },
-  { code: 'ESP', name: 'Spain',        status: 'visited', visitCount: 1, lastVisit: '2023-08-10', heartCount: 1 },
-  { code: 'KOR', name: 'South Korea',  status: 'visited', visitCount: 1, lastVisit: '2023-05-01' },
-  { code: 'GBR', name: 'United Kingdom', status: 'visited', visitCount: 2, lastVisit: '2024-12-20', heartCount: 1 },
-  { code: 'ISL', name: 'Iceland',      status: 'wishlist', citiesCount: 12 },
-  { code: 'NZL', name: 'New Zealand',  status: 'wishlist', citiesCount: 8 },
-  { code: 'PER', name: 'Peru',         status: 'wishlist', citiesCount: 5 },
-  { code: 'MAR', name: 'Morocco',      status: 'wishlist', citiesCount: 4 },
-  { code: 'NOR', name: 'Norway',       status: 'wishlist', citiesCount: 6 },
-  { code: 'CHN', name: 'China',        status: 'visited', visitCount: 8, isHome: true, hasNotes: true, heartCount: 5 },
-]
+const wishlistCount = computed(() => {
+  try { return (countryStore.wishlistCountries || []).length }
+  catch { return 0 }
+})
 
-const mockWishlist = mockVisitedCountries.filter(c => c.status === 'wishlist')
-const hasData = mockTrips.length > 0
+const hasData = computed(() => {
+  try { return (tripStore.recentTrips || []).length > 0 }
+  catch { return false }
+})
 
 function goToTrip(id: number) { router.push(`/trip/${id}`) }
 function goToNewTrip() { router.push('/trip/new') }
 function goToCountry(code: string, _status?: CountryStatus | null) {
   if (!code) return
-  const s = _status || mockVisitedCountries.find(c => c.code.toLowerCase() === code.toLowerCase())
-  if (s?.status === 'visited') router.push(`/country/${code.toLowerCase()}`)
-  else router.push('/wishlist')
+  const s = _status || allStatuses.value.find(c => c.code.toLowerCase() === code.toLowerCase())
+  if (!s) return
+  if (s.status === 'visited' || s.isHome) router.push(`/country/${code.toLowerCase()}`)
+  else if (s.status === 'wishlist') router.push('/wishlist')
+  // 未去国家：无操作
+}
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+function onGlobeHover(code: string | null) {
+  if (hoverTimer) clearTimeout(hoverTimer)
+  if (!code) {
+    hoverTimer = setTimeout(() => { statsHighlight.value = false; statsHighlightWishlist.value = false }, 200)
+    return
+  }
+  const s = allStatuses.value.find(c => c.code.toLowerCase() === code.toLowerCase())
+  if (!s) { statsHighlight.value = false; statsHighlightWishlist.value = false; return }
+  statsHighlight.value = !!(s.status === 'visited' || s.isHome)
+  statsHighlightWishlist.value = s.status === 'wishlist'
+}
+
+// 统计面板点击 → 联动地球
+function onStatsClick(key: string) {
+  if (key === 'countries') {
+    pulseTrigger.value++
+    statsHighlight.value = true
+    setTimeout(() => { statsHighlight.value = false }, 3000)
+  }
+  if (key === 'wishlist') {
+    statsHighlightWishlist.value = true
+    setTimeout(() => { statsHighlightWishlist.value = false }, 3000)
+  }
 }
 function goToTimeline() { router.push('/timeline') }
 function goToMap() { router.push('/') }
-function goToPhotos() { router.push('/timeline') }
+function goToNewTripPhotos() { router.push('/trip/new') }
 
-onMounted(() => {
-  setTimeout(() => { loading.value = false }, 800)
+onMounted(async () => {
+  try {
+    await Promise.all([
+      countryStore.fetchVisitedCountries(),
+      tripStore.fetchTrips(),
+      statsApi.getStats().then(res => { if (res.code === 200) stats.value = res.data }),
+    ])
+  } catch { /* mock will always succeed */ }
+  loading.value = false
 
   // Welcome animation — plays once per session
   const shown = sessionStorage.getItem('welcome-shown')
@@ -86,10 +118,12 @@ onMounted(() => {
     <!-- ═══════ Hero: Globe full viewport ═══════ -->
     <div class="globe-home__hero">
       <Globe3D
-        :country-statuses="mockVisitedCountries"
+        :country-statuses="allStatuses"
         :loading="false"
+        :pulse-trigger="pulseTrigger"
         class="globe-home__globe"
         @country-click="goToCountry"
+        @country-hover="onGlobeHover"
       />
 
       <!-- Welcome overlay -->
@@ -101,12 +135,15 @@ onMounted(() => {
       <!-- Stats sidebar -->
       <div class="globe-home__stats">
         <StatsPanel
-          :country-count="7"
-          :city-count="23"
-          :trip-count="12"
-          :flight-count="8"
-          :wishlist-count="mockWishlist.length"
-          :loading="false"
+          :country-count="stats.countryCount"
+          :city-count="stats.cityCount"
+          :trip-count="stats.tripCount"
+          :flight-count="stats.flightCount ?? 0"
+          :wishlist-count="wishlistCount"
+          :loading="loading"
+          :highlight-visited="statsHighlight"
+          :highlight-wishlist="statsHighlightWishlist"
+          @stats-click="onStatsClick"
         />
       </div>
 
@@ -129,12 +166,18 @@ onMounted(() => {
             <span class="body-sm">{{ t('home.quick.viewStats') }}</span>
           </button>
           <AppDivider />
-          <button class="quick-action-btn" @click="goToPhotos">
+          <button class="quick-action-btn" @click="goToNewTripPhotos">
             <AppIcon name="Camera" :size="16" color-class="text-ocean" />
             <span class="body-sm">{{ t('home.quick.uploadPhotos') }}</span>
           </button>
         </div>
       </AppCard>
+    </div>
+
+    <!-- ═══════ Transition: globe → below ═══════ -->
+    <div class="globe-home__divider-wrap">
+      <div class="globe-home__divider" />
+      <span class="globe-home__divider-label">Your Journey</span>
     </div>
 
     <!-- ═══════ Below Hero: Recent Trips ═══════ -->
@@ -147,7 +190,7 @@ onMounted(() => {
           </button>
         </div>
         <div class="globe-home__recent-strip">
-          <TripMiniCard v-for="trip in mockTrips" :key="trip.id" :trip="trip" @click="goToTrip(trip.id)" />
+          <TripMiniCard v-for="trip in tripStore.recentTrips" :key="trip.id" :trip="trip" @click="goToTrip(trip.id)" />
         </div>
       </div>
     </div>
@@ -289,12 +332,17 @@ onMounted(() => {
    Below Hero — Recent Trips
    ═══════════════════════════════════════════ */
 .globe-home__below {
-  padding: var(--space-2xl) var(--page-padding) var(--space-3xl);
-  background: var(--color-page);
+  padding: var(--space-xl) var(--page-padding) var(--space-3xl);
+  background: linear-gradient(180deg, var(--color-page) 0%, var(--color-card-hover) 100%);
 }
 .globe-home__below-inner {
   max-width: var(--content-max-width, 1280px);
   margin: 0 auto;
+  animation: below-in 0.6s var(--ease-out) 0.4s both;
+}
+@keyframes below-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .globe-home__recent-top {
   display: flex; align-items: baseline;
@@ -326,7 +374,7 @@ onMounted(() => {
 .globe-home__recent-strip {
   display: flex; gap: var(--card-gap, 20px);
   overflow-x: auto;
-  padding-bottom: var(--space-sm);
+  padding: var(--space-sm) var(--space-xs) var(--space-sm);
   scroll-behavior: smooth;
 }
 .globe-home__recent-strip::-webkit-scrollbar { height: 4px; }
@@ -337,6 +385,32 @@ onMounted(() => {
 .globe-home__empty-wrap {
   display: flex; align-items: center; justify-content: center;
   min-height: 100vh;
+}
+
+/* ────── Hero → Below divider ────── */
+.globe-home__divider-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--page-padding) var(--space-sm);
+  position: relative;
+}
+.globe-home__divider {
+  flex: 1;
+  max-width: 320px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--color-sunset), transparent);
+  opacity: 0.2;
+}
+.globe-home__divider-label {
+  font-family: var(--font-body);
+  font-size: var(--text-body-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 /* Responsive */

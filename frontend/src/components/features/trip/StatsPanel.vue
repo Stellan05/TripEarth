@@ -5,21 +5,27 @@
  * 每个 stat 行独立 hover 动画 + 数字 count up。
  */
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useOdometer } from '@/composables/useOdometer'
+import { useStagger } from '@/composables/useStagger'
 import { useI18n } from '@/composables/useI18n'
 import AppIcon from '@/components/base/AppIcon.vue'
 
 const { t } = useI18n()
 
-const props = defineProps<{
-  countryCount: number
-  cityCount: number
-  tripCount: number
-  flightCount?: number
-  wishlistCount?: number
-  loading?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    countryCount: number
+    cityCount: number
+    tripCount: number
+    flightCount?: number
+    wishlistCount?: number
+    loading?: boolean
+    highlightVisited?: boolean
+    highlightWishlist?: boolean
+  }>(),
+  { highlightVisited: false, highlightWishlist: false },
+)
 
 const ITEM_META: Record<string, { icon: string; accent: string }> = {
   countries:  { icon: 'Globe',   accent: 'text-sunset' },
@@ -41,6 +47,20 @@ const odometers = [useOdometer(700), useOdometer(700), useOdometer(700), useOdom
 watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightCount, props.wishlistCount], (vals) => {
   odometers.forEach((o, i) => { if (vals[i] !== undefined) o.rollTo(vals[i] as number) })
 }, { immediate: true })
+
+// stagger delays for first mount
+const staggerDelays = useStagger(5, 100, 80)
+
+// icon bounce triggers
+const iconBounce = ref(false)
+onMounted(() => {
+  setTimeout(() => { iconBounce.value = true }, 600)
+})
+
+
+const emit = defineEmits<{
+  'stats-click': [key: string]
+}>()
 </script>
 
 <template>
@@ -49,8 +69,23 @@ watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightC
       v-for="(item, i) in items"
       :key="item.key"
       class="stats-row"
+      :style="{ animationDelay: `${staggerDelays[i]}ms` }"
+      :class="{
+        'stats-row--visited-highlight': highlightVisited && item.key === 'countries',
+        'stats-row--wishlist-highlight': highlightWishlist && item.key === 'wishlist',
+        'stats-row--clickable': item.key === 'countries' || item.key === 'wishlist',
+      }"
+      @click="emit('stats-click', item.key)"
     >
-      <div class="stats-row__icon" :class="ITEM_META[item.key]?.accent || 'text-tertiary'">
+      <div
+        class="stats-row__icon"
+        :class="[
+          ITEM_META[item.key]?.accent || 'text-tertiary',
+          { 'stats-row__icon--bounce': iconBounce && (item.key === 'countries' || item.key === 'wishlist') },
+          { 'stats-row__icon--glow': highlightVisited && item.key === 'countries' },
+          { 'stats-row__icon--glow-forest': highlightWishlist && item.key === 'wishlist' },
+        ]"
+      >
         <AppIcon :name="ITEM_META[item.key]?.icon || 'Circle'" :size="15" />
       </div>
       <div class="stats-row__content">
@@ -67,6 +102,28 @@ watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightC
 </template>
 
 <style scoped>
+@keyframes stats-row-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes icon-bounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.3); }
+  60%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes icon-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 113, 74, 0.3); }
+  50%      { box-shadow: 0 0 0 8px rgba(232, 113, 74, 0); }
+}
+
+@keyframes glow-forest-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 156, 124, 0.3); }
+  50%      { box-shadow: 0 0 0 8px rgba(74, 156, 124, 0); }
+}
+
 .stats-panel {
   display: flex;
   flex-direction: column;
@@ -87,12 +144,30 @@ watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightC
   border-radius: var(--radius-sm);
   transition: background 200ms var(--ease-default),
               transform 200ms var(--ease-default);
-  cursor: default;
+  animation: stats-row-in 0.4s var(--ease-out) both;
+}
+
+.stats-row--clickable {
+  cursor: pointer;
 }
 
 .stats-row:hover {
   background: var(--color-card-hover);
   transform: translateX(3px);
+}
+
+.stats-row--visited-highlight {
+  background: rgba(232, 113, 74, 0.08);
+  border: 0.5px solid rgba(232, 113, 74, 0.2);
+  animation: stats-row-in 0.4s var(--ease-out) both,
+             icon-glow-pulse 1.5s ease-in-out 0.3s 3;
+}
+
+.stats-row--wishlist-highlight {
+  background: rgba(74, 156, 124, 0.08);
+  border: 0.5px solid rgba(74, 156, 124, 0.2);
+  animation: stats-row-in 0.4s var(--ease-out) both,
+             glow-forest-pulse 1.5s ease-in-out 0.3s 3;
 }
 
 .stats-row__icon {
@@ -104,6 +179,18 @@ watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightC
   border-radius: var(--radius-sm);
   background: var(--color-card-hover);
   flex-shrink: 0;
+}
+
+.stats-row__icon--bounce {
+  animation: icon-bounce 0.5s var(--ease-spring);
+}
+
+.stats-row__icon--glow {
+  animation: icon-glow-pulse 1.5s ease-in-out infinite;
+}
+
+.stats-row__icon--glow-forest {
+  animation: glow-forest-pulse 1.5s ease-in-out infinite;
 }
 
 .stats-row__content {

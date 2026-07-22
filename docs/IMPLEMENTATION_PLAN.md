@@ -19,7 +19,7 @@ Phase 0  →  Foundation Setup          0.5 day  ✅
 Phase 1  →  Atom Components           1.5 days ✅
 Phase 2  →  Molecule Components       2 days   🔧 部分完成
 Phase 3  →  Layout & Navigation       0.5 day  ✅
-Phase 4  →  API Layer & Mock Data     0.5 day  ⬜ 未开始
+Phase 4  →  API Layer & Mock Data     0.5 day  ✅
 Phase 5  →  Trip Editor Module        2 days   ✅
 Phase 6  →  Globe & Map Module        2 days   🔧 部分完成(Globe✅ Map⬜)
                                 ────────────

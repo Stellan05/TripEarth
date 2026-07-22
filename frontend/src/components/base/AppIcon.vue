@@ -15,8 +15,8 @@ const props = withDefaults(
   defineProps<{
     /** Lucide 图标名 */
     name: string
-    /** 图标尺寸 */
-    size?: 16 | 20 | 24 | 32
+    /** 图标尺寸 (支持数字和字符串) */
+    size?: number | string
     /** 颜色（使用 text-* utility class 或 CSS var） */
     colorClass?: string
     /** Stroke 宽度 */

@@ -51,6 +51,7 @@ withDefaults(
   top: calc(var(--page-padding) + 60px); /* NavPill height + offset */
   align-self: start;
   max-height: calc(100vh - var(--page-padding) * 2 - 60px);
+  overflow-y: auto;
 }
 
 .two-col__right {

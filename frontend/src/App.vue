@@ -7,13 +7,14 @@
  *   - 页面过渡动画（Vue Router transition）
  */
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import NavPill from '@/components/layout/NavPill.vue'
 import type { NavItem } from '@/components/layout/NavPill.vue'
 import Toast from '@/components/base/Toast.vue'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
+
 const navItems = computed<NavItem[]>(() => [
   { label: t('nav.globe'), icon: 'Globe', route: '/' },
   { label: t('nav.timeline'), icon: 'Clock', route: '/timeline' },
