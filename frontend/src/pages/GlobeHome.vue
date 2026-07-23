@@ -8,14 +8,44 @@ import AppEmptyState from '@/components/base/AppEmptyState.vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import AppDivider from '@/components/base/AppDivider.vue'
 import Globe3D from '@/components/features/globe/Globe3D.vue'
+import ViewModeToggle from '@/components/features/globe/ViewModeToggle.vue'
+import CountryHomeMap from '@/components/features/map/CountryHomeMap.vue'
+import type { HomeCity } from '@/components/features/map/CountryHomeMap.vue'
 import { useI18n } from '@/composables/useI18n'
+import { useAppStore } from '@/stores/appStore'
 import { useCountryStore } from '@/stores/countryStore'
 import { useTripStore } from '@/stores/tripStore'
 import * as statsApi from '@/api/stats'
 import type { CountryStatus } from '@/types/country'
 
+export interface FlightRoute {
+  id: number
+  startLat: number
+  startLng: number
+  endLat: number
+  endLng: number
+  airline: string
+  flightNo: string
+}
+
+// 机场坐标
+const AIRPORT_COORDS: Record<string, { lat: number; lng: number }> = {
+  CDG: { lat: 49.0097, lng: 2.5479 }, ORY: { lat: 48.7233, lng: 2.3794 },
+  HND: { lat: 35.5494, lng: 139.7798 }, KIX: { lat: 34.4273, lng: 135.2441 },
+  BKK: { lat: 13.6900, lng: 100.7501 }, CNX: { lat: 18.7669, lng: 98.9623 },
+  HKT: { lat: 8.1132, lng: 98.3169 },
+  XIY: { lat: 34.4471, lng: 108.7516 }, PVG: { lat: 31.1443, lng: 121.8083 },
+  CKG: { lat: 29.7192, lng: 106.6417 }, LJG: { lat: 26.6790, lng: 100.2289 },
+  // 长距离航线
+  PEK: { lat: 40.0799, lng: 116.6031 }, JFK: { lat: 40.6413, lng: -73.7781 },
+  LHR: { lat: 51.4700, lng: -0.4543 }, NRT: { lat: 35.7647, lng: 140.3864 },
+  LAX: { lat: 33.9416, lng: -118.4085 }, SYD: { lat: -33.9363, lng: 151.2802 },
+  DXB: { lat: 25.2532, lng: 55.3657 },
+}
+
 const router = useRouter()
 const { t } = useI18n()
+const appStore = useAppStore()
 const countryStore = useCountryStore()
 const tripStore = useTripStore()
 
@@ -26,6 +56,57 @@ const stats = ref({ countryCount: 0, cityCount: 0, tripCount: 0, flightCount: 0,
 const statsHighlight = ref(false)
 const statsHighlightWishlist = ref(false)
 const pulseTrigger = ref(0)
+
+const isLocalMode = computed(() => appStore.viewMode === 'local')
+const homeCountry = computed(() => (countryStore.visitedCountries || []).find(c => c.isHome))
+
+// 已知中国城市坐标（mock 数据用）
+const CN_CITY_COORDS: Record<string, [number, number]> = {
+  '北京': [39.9042, 116.4074],
+  '西安': [34.3416, 108.9398],
+  '上海': [31.2304, 121.4737],
+  '杭州': [30.2741, 120.1551],
+  '成都': [30.5728, 104.0668],
+  '重庆': [29.4316, 106.9123],
+  '丽江': [26.8721, 100.2299],
+}
+
+const homeCities = computed<HomeCity[]>(() => {
+  if (!isLocalMode.value || !homeCountry.value) return []
+  const seen = new Set<string>()
+  const result: HomeCity[] = []
+  for (const trip of localTrips.value) {
+    if (!seen.has(trip.cityName)) {
+      seen.add(trip.cityName)
+      const coords = CN_CITY_COORDS[trip.cityName]
+      if (coords) {
+        result.push({ name: trip.cityName, lat: coords[0], lng: coords[1], tripId: trip.id })
+      }
+    }
+  }
+  return result
+})
+
+// 中国城市 → 省份映射
+const CN_CITY_TO_REGION: Record<string, string> = {
+  '北京': '北京市', '西安': '陕西省', '上海': '上海市', '杭州': '浙江省',
+  '成都': '四川省', '重庆': '重庆市', '丽江': '云南省',
+}
+
+const regionsCount = computed(() => {
+  if (!isLocalMode.value) return 0
+  const regions = new Set<string>()
+  for (const trip of localTrips.value) {
+    const region = CN_CITY_TO_REGION[trip.cityName]
+    if (region) regions.add(region)
+  }
+  return regions.size
+})
+
+const localTrips = computed(() => {
+  if (!homeCountry.value) return []
+  return tripStore.recentTrips.filter(t => t.countryCode === homeCountry.value.code)
+})
 
 const allStatuses = computed<CountryStatus[]>(() => {
   try {
@@ -42,17 +123,30 @@ const wishlistCount = computed(() => {
 })
 
 const hasData = computed(() => {
-  try { return (tripStore.recentTrips || []).length > 0 }
+  try {
+    const trips = isLocalMode.value ? localTrips.value : tripStore.recentTrips
+    return trips.length > 0
+  }
   catch { return false }
 })
 
 function goToTrip(id: number) { router.push(`/trip/${id}`) }
 function goToNewTrip() { router.push('/trip/new') }
+function goToHomeCity(city: HomeCity) {
+  if (homeCountry.value && city.tripId) {
+    router.push(`/trip/${city.tripId}`)
+  }
+}
 function goToCountry(code: string, _status?: CountryStatus | null) {
   if (!code) return
   const s = _status || allStatuses.value.find(c => c.code.toLowerCase() === code.toLowerCase())
   if (!s) return
-  if (s.status === 'visited' || s.isHome) router.push(`/country/${code.toLowerCase()}`)
+  // 用户所在国 → 切换到本地模式
+  if (s.isHome) {
+    appStore.setViewMode('local')
+    return
+  }
+  if (s.status === 'visited') router.push(`/country/${code.toLowerCase()}`)
   else if (s.status === 'wishlist') router.push('/wishlist')
   // 未去国家：无操作
 }
@@ -69,12 +163,60 @@ function onGlobeHover(code: string | null) {
   statsHighlightWishlist.value = s.status === 'wishlist'
 }
 
+// ── 飞行航线计算 ──
+function buildFlightRoutes(tripFilter?: (code: string) => boolean): FlightRoute[] {
+  const all: FlightRoute[] = []
+  let id = 0
+  for (const trip of tripStore.recentTrips) {
+    if (tripFilter && !tripFilter(trip.countryCode)) continue
+    const routes: { dep: string; arr: string; airline: string; no: string }[] = []
+    if (trip.countryCode === 'FRA') routes.push({ dep: 'CDG', arr: 'ORY', airline: 'Air France', no: 'AF1234' })
+    if (trip.countryCode === 'JPN') routes.push({ dep: 'HND', arr: 'KIX', airline: 'ANA', no: 'NH123' })
+    if (trip.countryCode === 'THA') routes.push({ dep: 'BKK', arr: 'CNX', airline: 'Thai Airways', no: 'TG123' }, { dep: 'CNX', arr: 'HKT', airline: 'Thai Airways', no: 'TG456' })
+    if (trip.countryCode === 'CHN') routes.push({ dep: 'XIY', arr: 'PVG', airline: '中国东方航空', no: 'MU1234' }, { dep: 'CKG', arr: 'LJG', airline: '中国国航', no: 'CA567' })
+    for (const r of routes) {
+      const dep = AIRPORT_COORDS[r.dep]
+      const arr = AIRPORT_COORDS[r.arr]
+      if (dep && arr) {
+        all.push({ id: id++, startLat: dep.lat, startLng: dep.lng, endLat: arr.lat, endLng: arr.lng, airline: r.airline, flightNo: r.no })
+      }
+    }
+  }
+  // 长距离 Demo 航线
+  const longHaul: { dep: string; arr: string; airline: string; no: string }[] = [
+    { dep: 'PEK', arr: 'JFK', airline: 'Air China', no: 'CA981' },
+    { dep: 'LHR', arr: 'NRT', airline: 'British Airways', no: 'BA005' },
+    { dep: 'LAX', arr: 'SYD', airline: 'Delta', no: 'DL017' },
+    { dep: 'DXB', arr: 'JFK', airline: 'Emirates', no: 'EK201' },
+    { dep: 'PEK', arr: 'LHR', airline: 'Air China', no: 'CA937' },
+  ]
+  for (const r of longHaul) {
+    const dep = AIRPORT_COORDS[r.dep]
+    const arr = AIRPORT_COORDS[r.arr]
+    if (dep && arr) {
+      all.push({ id: id++, startLat: dep.lat, startLng: dep.lng, endLat: arr.lat, endLng: arr.lng, airline: r.airline, flightNo: r.no })
+    }
+  }
+  return all
+}
+
+const flightRoutes = computed<FlightRoute[]>(() => buildFlightRoutes())
+const localFlightRoutes = computed<FlightRoute[]>(() => {
+  if (!homeCountry.value) return []
+  return buildFlightRoutes(code => code === homeCountry.value.code)
+})
+
+const flightPulseTrigger = ref(0)
+
 // 统计面板点击 → 联动地球
 function onStatsClick(key: string) {
   if (key === 'countries') {
     pulseTrigger.value++
     statsHighlight.value = true
     setTimeout(() => { statsHighlight.value = false }, 3000)
+  }
+  if (key === 'flights') {
+    flightPulseTrigger.value++
   }
   if (key === 'wishlist') {
     statsHighlightWishlist.value = true
@@ -115,19 +257,42 @@ onMounted(async () => {
   </div>
 
   <div v-else class="globe-home">
-    <!-- ═══════ Hero: Globe full viewport ═══════ -->
+    <!-- ═══════ Hero: Globe / Map full viewport ═══════ -->
     <div class="globe-home__hero">
-      <Globe3D
-        :country-statuses="allStatuses"
-        :loading="false"
-        :pulse-trigger="pulseTrigger"
-        class="globe-home__globe"
-        @country-click="goToCountry"
-        @country-hover="onGlobeHover"
-      />
+      <!-- Global mode: 3D Globe / Local mode: Leaflet Country Map -->
+      <transition name="mode-fade" mode="out-in">
+        <Globe3D
+          v-if="!isLocalMode"
+          key="globe"
+          :country-statuses="allStatuses"
+          :loading="false"
+          :pulse-trigger="pulseTrigger"
+          :flight-routes="flightRoutes"
+          :flight-pulse-trigger="flightPulseTrigger"
+          class="globe-home__globe"
+          @country-click="goToCountry"
+          @country-hover="onGlobeHover"
+        />
 
-      <!-- Welcome overlay -->
-      <div v-if="welcomeVisible" :class="['globe-home__welcome', { 'globe-home__welcome--leave': welcomeLeaving }]">
+        <CountryHomeMap
+          v-else
+          key="map"
+          :cities="homeCities"
+          :country-code="homeCountry?.code ?? ''"
+          :loading="false"
+          :flight-routes="localFlightRoutes"
+          :flight-pulse-trigger="flightPulseTrigger"
+          @city-click="goToHomeCity"
+        />
+      </transition>
+
+      <!-- View Mode Toggle (top-right below NavPill) -->
+      <div class="globe-home__toggle-wrap">
+        <ViewModeToggle />
+      </div>
+
+      <!-- Welcome overlay (global mode only) -->
+      <div v-if="!isLocalMode && welcomeVisible" :class="['globe-home__welcome', { 'globe-home__welcome--leave': welcomeLeaving }]">
         <h1 class="globe-home__welcome-title">{{ t('home.welcome') }}</h1>
         <p class="globe-home__welcome-desc">{{ t('home.today') }}</p>
       </div>
@@ -135,12 +300,15 @@ onMounted(async () => {
       <!-- Stats sidebar -->
       <div class="globe-home__stats">
         <StatsPanel
-          :country-count="stats.countryCount"
-          :city-count="stats.cityCount"
-          :trip-count="stats.tripCount"
-          :flight-count="stats.flightCount ?? 0"
+          :key="`stats-${appStore.viewMode}`"
+          :country-count="isLocalMode ? localTrips.length : stats.countryCount"
+          :city-count="isLocalMode ? homeCities.length : stats.cityCount"
+          :trip-count="isLocalMode ? localTrips.length : stats.tripCount"
+          :flight-count="isLocalMode ? 0 : (stats.flightCount ?? 0)"
           :wishlist-count="wishlistCount"
+          :regions-count="regionsCount"
           :loading="loading"
+          :hide-countries="isLocalMode"
           :highlight-visited="statsHighlight"
           :highlight-wishlist="statsHighlightWishlist"
           @stats-click="onStatsClick"
@@ -190,7 +358,7 @@ onMounted(async () => {
           </button>
         </div>
         <div class="globe-home__recent-strip">
-          <TripMiniCard v-for="trip in tripStore.recentTrips" :key="trip.id" :trip="trip" @click="goToTrip(trip.id)" />
+          <TripMiniCard v-for="trip in (isLocalMode ? localTrips : tripStore.recentTrips)" :key="trip.id" :trip="trip" @click="goToTrip(trip.id)" />
         </div>
       </div>
     </div>
@@ -387,6 +555,26 @@ onMounted(async () => {
   min-height: 100vh;
 }
 
+/* ────── View Mode Toggle ────── */
+.globe-home__toggle-wrap {
+  position: absolute;
+  top: 16px;
+  right: max(16px, calc((100% - 1280px) / 2 + 16px));
+  z-index: 20;
+  animation: toggle-in 0.4s var(--ease-out) 0.6s both;
+}
+@keyframes toggle-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1024px) {
+  .globe-home__toggle-wrap { right: 16px; }
+}
+@media (max-width: 768px) {
+  .globe-home__toggle-wrap { top: 12px; right: 12px; }
+}
+
 /* ────── Hero → Below divider ────── */
 .globe-home__divider-wrap {
   display: flex;
@@ -424,5 +612,15 @@ onMounted(async () => {
   .globe-home__hero { height: 70vh; min-height: 400px; }
   .globe-home__below { padding: var(--space-xl) var(--space-md); }
   .globe-home__recent-title { font-size: var(--text-body-lg); }
+}
+
+/* ────── Mode transition ────── */
+.mode-fade-enter-active,
+.mode-fade-leave-active {
+  transition: opacity 300ms var(--ease-out);
+}
+.mode-fade-enter-from,
+.mode-fade-leave-to {
+  opacity: 0;
 }
 </style>

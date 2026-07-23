@@ -15,11 +15,25 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { CountryStatus } from '@/types/country'
 
+export interface FlightArc {
+  id: number
+  startLat: number
+  startLng: number
+  endLat: number
+  endLng: number
+  airline: string
+  flightNo: string
+}
+
 const props = defineProps<{
   countryStatuses: CountryStatus[]
   loading?: boolean
   /** 递增时触发已去国家脉冲闪烁 */
   pulseTrigger?: number
+  /** 航线数据 */
+  flightRoutes?: FlightArc[]
+  /** 递增时触发航线显隐 */
+  flightPulseTrigger?: number
 }>()
 
 const emit = defineEmits<{
@@ -198,6 +212,18 @@ async function init() {
         emit('country-click', norm(iso), status)
       })
 
+    // ── Flight arcs (3D) ──
+    g.arcsData([])
+      .arcStartLat((d: Record<string, unknown>) => d.startLat as number)
+      .arcStartLng((d: Record<string, unknown>) => d.startLng as number)
+      .arcEndLat((d: Record<string, unknown>) => d.endLat as number)
+      .arcEndLng((d: Record<string, unknown>) => d.endLng as number)
+      .arcAltitudeAutoScale(0.7)
+.arcColor(() => ['rgba(255,255,255,0.92)', 'rgba(255,255,255,0.05)'])
+      .arcStroke(() => 0.8)
+.arcsTransitionDuration(400)
+    
+
     g.controls().autoRotate = true
     g.controls().autoRotateSpeed = 0.25
     g.controls().enableZoom = true
@@ -244,6 +270,19 @@ watch(
 watch(() => props.pulseTrigger, () => {
   if (globe && ready && !destroyed) {
     pulseVisitedCountries(globe as unknown as ReturnType<typeof import('globe.gl').default>)
+  }
+})
+
+// 航线显隐（统计面板点击飞行次数触发）
+let showArcs = false
+watch(() => props.flightPulseTrigger, () => {
+  if (!globe || !ready || destroyed) return
+  showArcs = !showArcs
+  const g = globe as unknown as ReturnType<typeof import('globe.gl').default>
+  if (showArcs && props.flightRoutes?.length) {
+    g.arcsData(props.flightRoutes as unknown as Record<string, unknown>[])
+  } else {
+    g.arcsData([])
   }
 })
 

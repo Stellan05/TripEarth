@@ -4,6 +4,8 @@ export interface Photo {
   url: string
   caption?: string
   takenAt?: string
+  lat?: number
+  lng?: number
   aspectRatio?: number
   sortOrder: number
 }

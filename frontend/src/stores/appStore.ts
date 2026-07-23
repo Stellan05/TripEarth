@@ -4,9 +4,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+export type ViewMode = 'global' | 'local'
+
 export const useAppStore = defineStore('app', () => {
   const theme = ref<'light' | 'dark'>('light')
   const loading = ref(false)
+  const viewMode = ref<ViewMode>('global')
 
   function toggleTheme() {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
@@ -26,5 +29,9 @@ export const useAppStore = defineStore('app', () => {
     document.body.setAttribute('data-theme', theme.value)
   }
 
-  return { theme, loading, toggleTheme, initTheme }
+  function setViewMode(mode: ViewMode) {
+    viewMode.value = mode
+  }
+
+  return { theme, loading, viewMode, toggleTheme, initTheme, setViewMode }
 })

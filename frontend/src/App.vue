@@ -7,16 +7,20 @@
  *   - 页面过渡动画（Vue Router transition）
  */
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import NavPill from '@/components/layout/NavPill.vue'
 import type { NavItem } from '@/components/layout/NavPill.vue'
 import Toast from '@/components/base/Toast.vue'
 import { useI18n } from '@/composables/useI18n'
+import { useAppStore } from '@/stores/appStore'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 
 const navItems = computed<NavItem[]>(() => [
-  { label: t('nav.globe'), icon: 'Globe', route: '/' },
+  appStore.viewMode === 'local'
+    ? { label: t('nav.map'), icon: 'Map', route: '/' }
+    : { label: t('nav.globe'), icon: 'Globe', route: '/' },
   { label: t('nav.timeline'), icon: 'Clock', route: '/timeline' },
   { label: t('nav.wishlist'), icon: 'Bookmark', route: '/wishlist' },
   { label: t('nav.newTrip'), icon: 'Plus', route: '/trip/new' },

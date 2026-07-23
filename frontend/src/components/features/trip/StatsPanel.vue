@@ -7,7 +7,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useOdometer } from '@/composables/useOdometer'
-import { useStagger } from '@/composables/useStagger'
 import { useI18n } from '@/composables/useI18n'
 import AppIcon from '@/components/base/AppIcon.vue'
 
@@ -20,36 +19,61 @@ const props = withDefaults(
     tripCount: number
     flightCount?: number
     wishlistCount?: number
+    regionsCount?: number
     loading?: boolean
     highlightVisited?: boolean
     highlightWishlist?: boolean
+    hideCountries?: boolean
   }>(),
-  { highlightVisited: false, highlightWishlist: false },
+  { highlightVisited: false, highlightWishlist: false, hideCountries: false },
 )
 
 const ITEM_META: Record<string, { icon: string; accent: string }> = {
   countries:  { icon: 'Globe',   accent: 'text-sunset' },
+  regions:    { icon: 'Map',     accent: 'text-sunset' },
   cities:     { icon: 'MapPin',  accent: 'text-ocean' },
   trips:      { icon: 'Calendar',accent: 'text-forest' },
   flights:    { icon: 'Plane',   accent: 'text-ocean' },
   wishlist:   { icon: 'Heart',   accent: 'text-forest' },
 }
 
-const items = computed(() => [
-  { key: 'countries', value: props.countryCount, label: t('home.stats.countries') },
-  { key: 'cities',   value: props.cityCount, label: t('home.stats.cities') },
-  { key: 'trips',    value: props.tripCount, label: t('home.stats.trips') },
-  { key: 'flights',  value: props.flightCount ?? 0, label: t('home.stats.flights') },
-  { key: 'wishlist', value: props.wishlistCount ?? 0, label: t('home.stats.wishlist') },
-])
+const items = computed(() => {
+  if (props.hideCountries) {
+    return [
+      { key: 'cities',   value: props.cityCount, label: t('home.stats.cities') },
+      { key: 'trips',    value: props.tripCount, label: t('home.stats.trips') },
+      { key: 'flights',  value: props.flightCount ?? 0, label: t('home.stats.flights') },
+    ]
+  }
+  return [
+    { key: 'countries', value: props.countryCount, label: t('home.stats.countries') },
+    { key: 'cities',   value: props.cityCount, label: t('home.stats.cities') },
+    { key: 'trips',    value: props.tripCount, label: t('home.stats.trips') },
+    { key: 'flights',  value: props.flightCount ?? 0, label: t('home.stats.flights') },
+    { key: 'wishlist', value: props.wishlistCount ?? 0, label: t('home.stats.wishlist') },
+  ]
+})
 
 const odometers = [useOdometer(700), useOdometer(700), useOdometer(700), useOdometer(700), useOdometer(700)]
+const odometerValues = ref<Record<string, number>>({
+  countries: 0, cities: 0, trips: 0, flights: 0, wishlist: 0,
+})
+
 watch(() => [props.countryCount, props.cityCount, props.tripCount, props.flightCount, props.wishlistCount], (vals) => {
-  odometers.forEach((o, i) => { if (vals[i] !== undefined) o.rollTo(vals[i] as number) })
+  const keys = ['countries', 'cities', 'trips', 'flights', 'wishlist']
+  odometers.forEach((o, i) => {
+    if (vals[i] !== undefined) {
+      o.rollTo(vals[i] as number)
+      odometerValues.value[keys[i]] = vals[i] as number
+    }
+  })
 }, { immediate: true })
 
-// stagger delays for first mount
-const staggerDelays = useStagger(5, 100, 80)
+// stagger delays — 动态跟随 item 数量
+const staggerDelays = computed(() => {
+  const base = 100, step = 80
+  return items.value.map((_, i) => base + i * step)
+})
 
 // icon bounce triggers
 const iconBounce = ref(false)
@@ -73,7 +97,7 @@ const emit = defineEmits<{
       :class="{
         'stats-row--visited-highlight': highlightVisited && item.key === 'countries',
         'stats-row--wishlist-highlight': highlightWishlist && item.key === 'wishlist',
-        'stats-row--clickable': item.key === 'countries' || item.key === 'wishlist',
+        'stats-row--clickable': item.key === 'flights' || (!props.hideCountries && (item.key === 'countries' || item.key === 'wishlist')),
       }"
       @click="emit('stats-click', item.key)"
     >
@@ -81,7 +105,7 @@ const emit = defineEmits<{
         class="stats-row__icon"
         :class="[
           ITEM_META[item.key]?.accent || 'text-tertiary',
-          { 'stats-row__icon--bounce': iconBounce && (item.key === 'countries' || item.key === 'wishlist') },
+          { 'stats-row__icon--bounce': iconBounce },
           { 'stats-row__icon--glow': highlightVisited && item.key === 'countries' },
           { 'stats-row__icon--glow-forest': highlightWishlist && item.key === 'wishlist' },
         ]"
@@ -93,7 +117,7 @@ const emit = defineEmits<{
           <template v-if="loading">
             <span class="stats-row__skeleton" />
           </template>
-          <template v-else>{{ odometers[i].displayValue }}</template>
+          <template v-else>{{ odometerValues[item.key] }}</template>
         </span>
         <span class="stats-row__label">{{ item.label }}</span>
       </div>

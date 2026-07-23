@@ -13,7 +13,7 @@
  * 状态:
  *   loading / empty / error / normal
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import L from 'leaflet'
 import { useMap } from '@/composables/useMap'
 import { createCityLabelMarker } from './CityMarker'
@@ -100,6 +100,10 @@ onMounted(() => {
     if (props.cities.length) {
       renderCities()
     }
+
+    // 确保布局稳定后重算地图尺寸（页面过渡动画可能导致容器尺寸未就绪）
+    nextTick(() => map.value?.invalidateSize())
+    setTimeout(() => map.value?.invalidateSize(), 300)
   } catch (e) {
     stateError.value = (e as Error).message || 'Failed to initialize map'
   } finally {
@@ -197,8 +201,13 @@ watch(
   }
 }
 
-/* Leaflet 默认 z-index 为 400，调整容器层级避免遮挡导航 */
-:deep(.leaflet-pane) {
-  z-index: 2;
+/* 确保地图容器有自己的合成层，防止 sticky/transition 干扰 */
+:deep(.leaflet-map-pane) {
+  will-change: auto;
+}
+
+/* 防止 markers 被 overflow:hidden 裁剪 */
+:deep(.leaflet-marker-pane) {
+  z-index: 5 !important;
 }
 </style>

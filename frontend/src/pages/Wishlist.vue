@@ -15,6 +15,7 @@ import PageHeader from '@/components/shared/PageHeader.vue'
 import CategoryToggle from '@/components/features/wishlist/CategoryToggle.vue'
 import DestinationCard from '@/components/features/wishlist/DestinationCard.vue'
 import AddFab from '@/components/features/wishlist/AddFab.vue'
+import WishlistDetailModal from '@/components/features/wishlist/WishlistDetailModal.vue'
 import AppModal from '@/components/base/AppModal.vue'
 import SearchInput from '@/components/shared/SearchInput.vue'
 import CountrySelect from '@/components/shared/CountrySelect.vue'
@@ -37,6 +38,8 @@ const newCountryCode = ref('')
 const newCityName = ref('')
 const newNote = ref('')
 const submitting = ref(false)
+const detailDest = ref<WishlistItem | null>(null)
+const detailVisible = ref(false)
 
 // ── Computed ──
 
@@ -90,6 +93,24 @@ async function removeItem(id: number) {
     success('Removed from wishlist')
   } catch {
     showError('Failed to remove')
+  }
+}
+
+function openDetail(item: WishlistItem) {
+  detailDest.value = item
+  detailVisible.value = true
+}
+
+function closeDetail() {
+  detailVisible.value = false
+  detailDest.value = null
+}
+
+function onUpdateEntry(itemId: number, entries: import('@/types/wishlist').WishlistEntry[]) {
+  const item = wishlistStore.items.find(i => i.id === itemId)
+  if (item) {
+    item.entries = entries
+    item.cityCount = entries.length
   }
 }
 
@@ -147,10 +168,17 @@ onMounted(() => {
         v-for="item in filteredItems"
         :key="item.id"
         :destination="item"
-        :expanded="false"
-        @click="() => {}"
+        @click="openDetail(item)"
       />
     </GridLayout>
+
+    <!-- Detail Modal -->
+    <WishlistDetailModal
+      :destination="detailDest"
+      :visible="detailVisible"
+      @close="closeDetail"
+      @update-entry="onUpdateEntry"
+    />
 
     <!-- Add FAB -->
     <AddFab @click="openModal" />

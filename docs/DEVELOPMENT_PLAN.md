@@ -730,13 +730,13 @@ Content-Type: application/json（除上传外）
 
 | # | Method | URL | 请求参数 | 响应 data | 分页 | 缓存 | MVP |
 |---|--------|-----|----------|-----------|------|------|-----|
-| F1 | GET | `/api/trips/:id/flights` | 路径参数 | `Flight[]`（flightNo, airline, aircraft, departureTime, arrivalTime, depAirport, arrAirport） | ❌ | ❌ | ✅ |
+| F1 | GET | `/api/trips/:id/flights` | 路径参数 | `Flight[]`（flightNo, airline, aircraft, departureTime, arrivalTime, depAirport, arrAirport, status, actualDeparture, actualArrival, gate, terminal, departureCity, arrivalCity, duration） | ❌ | ❌ | ✅ |
 
 #### 照片接口
 
 | # | Method | URL | 请求参数 | 响应 data | 分页 | 缓存 | MVP |
 |---|--------|-----|----------|-----------|------|------|-----|
-| P1 | GET | `/api/trips/:id/photos` | 路径参数 + 分页 | `Photo[]`（url, caption, takenAt, sortOrder） | ✅ | ❌ | ✅ |
+| P1 | GET | `/api/trips/:id/photos` | 路径参数 + 分页 | `Photo[]`（url, caption, takenAt, lat, lng, sortOrder） | ✅ | ❌ | ✅ |
 | P2 | POST | `/api/trips/:id/photos` | multipart/form-data（多文件） | `Photo[]`（上传后的 URL 列表） | ❌ | ❌ | ✅ |
 | P3 | PUT | `/api/photos/:id` | `{ caption, sortOrder }` body | 无 | ❌ | ❌ | ✅ |
 | P4 | DELETE | `/api/photos/:id` | 路径参数 | 无 | ❌ | ❌ | ✅ |
@@ -752,9 +752,12 @@ Content-Type: application/json（除上传外）
 
 | # | Method | URL | 请求参数 | 响应 data | 分页 | 缓存 | MVP |
 |---|--------|-----|----------|-----------|------|------|-----|
-| W1 | GET | `/api/wishlist` | ?type=COUNTRY\|CITY | `WishlistItem[]`（id, type, countryCode, countryName, cityName, note, cityCount） | ❌ | ❌ | ✅ |
+| W1 | GET | `/api/wishlist` | ?type=COUNTRY\|CITY | `WishlistItem[]`（id, type, countryCode, countryName, cityName, note, cityCount, entries） | ❌ | ❌ | ✅ |
 | W2 | POST | `/api/wishlist` | `{ type, countryCode, cityName?, note? }` | `{ id }` | ❌ | ❌ | ✅ |
 | W3 | DELETE | `/api/wishlist/:id` | 路径参数 | 无 | ❌ | ❌ | ✅ |
+| W4 | GET | `/api/wishlist/:id/entries` | 路径参数 | `WishlistEntry[]`（id, title, description, imageUrl, addedAt） | ❌ | ❌ | ✅ |
+| W5 | POST | `/api/wishlist/:id/entries` | `{ title, description?, imageUrl? }` | `{ id }` | ❌ | ❌ | ✅ |
+| W6 | DELETE | `/api/wishlist/entries/:entryId` | 路径参数 | 无 | ❌ | ❌ | ✅ |
 
 #### 统计接口
 
@@ -777,7 +780,7 @@ countries ────── 1:N ────── trips ────── 1:N
                                │
                                └── 1:N ── trip_routes (as from→to)
 
-countries ────── 1:N ────── wishlist (type=COUNTRY)
+countries ────── 1:N ────── wishlist ── 1:N ────── wishlist_entries
 ```
 
 ### 7.2 表结构
@@ -856,16 +859,24 @@ CREATE TABLE trip_routes (
 
 ```sql
 CREATE TABLE flights (
-    id               BIGINT       PRIMARY KEY AUTO_INCREMENT,
-    route_id         BIGINT       NOT NULL               COMMENT '关联路线段',
-    flight_no        VARCHAR(20)                          COMMENT '航班号(AF111)',
-    airline          VARCHAR(100)                         COMMENT '航空公司',
-    aircraft         VARCHAR(50)                          COMMENT '机型',
-    departure_time   DATETIME                             COMMENT '起飞时间',
-    arrival_time     DATETIME                             COMMENT '降落时间',
-    departure_airport VARCHAR(10)                         COMMENT '出发机场代码',
-    arrival_airport   VARCHAR(10)                         COMMENT '到达机场代码',
-    created_at       DATETIME     NOT NULL DEFAULT NOW(),
+    id                BIGINT       PRIMARY KEY AUTO_INCREMENT,
+    route_id          BIGINT       NOT NULL               COMMENT '关联路线段',
+    flight_no         VARCHAR(20)                          COMMENT '航班号(AF111)',
+    airline           VARCHAR(100)                         COMMENT '航空公司',
+    aircraft          VARCHAR(100)                         COMMENT '机型全称',
+    departure_time    DATETIME                             COMMENT '计划起飞时间',
+    arrival_time      DATETIME                             COMMENT '计划降落时间',
+    departure_airport VARCHAR(10)                          COMMENT '出发机场代码',
+    arrival_airport   VARCHAR(10)                          COMMENT '到达机场代码',
+    status            VARCHAR(20)  DEFAULT 'scheduled'    COMMENT '航班状态: scheduled/boarding/departed/in-air/landed/delayed/cancelled',
+    actual_departure  DATETIME                             COMMENT '实际出发时间',
+    actual_arrival    DATETIME                             COMMENT '实际到达时间',
+    gate              VARCHAR(10)                          COMMENT '登机口',
+    terminal          VARCHAR(20)                          COMMENT '航站楼',
+    departure_city    VARCHAR(100)                         COMMENT '出发城市名',
+    arrival_city      VARCHAR(100)                         COMMENT '到达城市名',
+    duration          INT                                  COMMENT '飞行时长(分钟)',
+    created_at        DATETIME     NOT NULL DEFAULT NOW(),
     INDEX idx_route_id (route_id),
     FOREIGN KEY (route_id) REFERENCES trip_routes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='航班信息';
@@ -880,6 +891,8 @@ CREATE TABLE photos (
     url        VARCHAR(500)  NOT NULL                  COMMENT '文件路径',
     caption    VARCHAR(500)                            COMMENT '照片说明',
     taken_at   DATETIME                               COMMENT '拍摄时间(EXIF)',
+    lat        DECIMAL(10,7)                           COMMENT '拍摄地纬度',
+    lng        DECIMAL(10,7)                           COMMENT '拍摄地经度',
     sort_order INT           NOT NULL DEFAULT 0        COMMENT '排序',
     created_at DATETIME      NOT NULL DEFAULT NOW(),
     INDEX idx_trip_id (trip_id),
@@ -897,11 +910,24 @@ CREATE TABLE wishlist (
     country_code VARCHAR(3)                            COMMENT '国家代码',
     city_name    VARCHAR(100)                          COMMENT '城市名(type=CITY时)',
     note         VARCHAR(500)                          COMMENT '备注',
+    city_count   INT          DEFAULT 0                COMMENT '已保存地点数(缓存)',
     is_deleted   TINYINT      NOT NULL DEFAULT 0       COMMENT '逻辑删除',
     created_at   DATETIME     NOT NULL DEFAULT NOW(),
     INDEX idx_user_id (user_id),
     INDEX idx_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='想去清单';
+
+CREATE TABLE wishlist_entries (
+    id           BIGINT       PRIMARY KEY AUTO_INCREMENT,
+    wishlist_id  BIGINT       NOT NULL                 COMMENT '关联想去清单',
+    title        VARCHAR(200) NOT NULL                 COMMENT '地点名称',
+    description  TEXT                                  COMMENT '描述',
+    image_url    VARCHAR(500)                          COMMENT '图片URL',
+    added_at     DATE                                  COMMENT '添加日期',
+    created_at   DATETIME     NOT NULL DEFAULT NOW(),
+    INDEX idx_wishlist_id (wishlist_id),
+    FOREIGN KEY (wishlist_id) REFERENCES wishlist(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='想去清单条目';
 ```
 
 ### 7.3 表关系总结
@@ -916,6 +942,7 @@ CREATE TABLE wishlist (
 | trip_cities | 1:N | trip_routes (as to) | trip_routes.to_city_id → trip_cities.id | CASCADE |
 | trip_routes | 1:1 | flights | flights.route_id → trip_routes.id | CASCADE |
 | countries | 1:N | wishlist | wishlist.country_code → countries.code | RESTRICT |
+| wishlist | 1:N | wishlist_entries | wishlist_entries.wishlist_id → wishlist.id | CASCADE |
 
 ### 7.4 种子数据
 

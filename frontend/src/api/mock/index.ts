@@ -16,6 +16,8 @@ import {
   mockStats,
   mockPhotos,
   mockWishlistItems,
+  chinaCityToRegion,
+  mockChinaRegions,
 } from './data'
 
 /* ── Helpers ── */

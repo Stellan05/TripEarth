@@ -44,6 +44,22 @@ export interface Flight {
   arrivalTime: string
   departureAirport: string
   arrivalAirport: string
+  /** 航班状态 */
+  status?: 'scheduled' | 'boarding' | 'departed' | 'in-air' | 'landed' | 'delayed' | 'cancelled'
+  /** 实际出发时间（未提供则使用 departureTime） */
+  actualDeparture?: string
+  /** 实际到达时间 */
+  actualArrival?: string
+  /** 登机口 */
+  gate?: string
+  /** 航站楼 */
+  terminal?: string
+  /** 出发城市名 */
+  departureCity?: string
+  /** 到达城市名 */
+  arrivalCity?: string
+  /** 飞行时长（分钟） */
+  duration?: number
 }
 
 /** 旅行详情 */
@@ -67,6 +83,7 @@ export interface DayInfo {
   dayIndex: number
   date: string
   hasPhotos: boolean
+  hasNotes: boolean
 }
 
 /** 统计数据 */

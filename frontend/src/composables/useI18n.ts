@@ -20,6 +20,7 @@ const zhCN: LocaleMessages = {
 
   // 导航
   'nav.globe': '地球',
+  'nav.map': '地图',
   'nav.timeline': '时间轴',
   'nav.wishlist': '想去',
   'nav.newTrip': '新增旅行',
@@ -41,11 +42,16 @@ const zhCN: LocaleMessages = {
   'home.loading': '正在加载你的旅行地图…',
   'home.stats.flights': '飞行次数',
   'home.stats.wishlist': '收藏目的地',
+  'home.stats.regions': '已去地区',
   'home.wishlist.title': '想去的目的地',
   'home.wishlist.viewAll': '查看全部',
   'home.quick.browseMap': '浏览地图',
   'home.quick.viewStats': '查看统计',
   'home.quick.uploadPhotos': '上传照片',
+  'home.switchToLocal': '切换至本地地图',
+  'home.switchToGlobal': '切换至全球地球',
+  'home.local': '本地',
+  'home.global': '全球',
 
   // 主题
   'theme.light': '浅色',
@@ -66,6 +72,7 @@ const enUS: LocaleMessages = {
   'app.tagline': 'Capture every journey',
 
   'nav.globe': 'Globe',
+  'nav.map': 'Map',
   'nav.timeline': 'Timeline',
   'nav.wishlist': 'Wishlist',
   'nav.newTrip': 'New Trip',
@@ -86,11 +93,16 @@ const enUS: LocaleMessages = {
   'home.loading': 'Loading your travel map…',
   'home.stats.flights': 'Flights',
   'home.stats.wishlist': 'Wishlist',
+  'home.stats.regions': 'Regions',
   'home.wishlist.title': 'Destinations',
   'home.wishlist.viewAll': 'View All',
   'home.quick.browseMap': 'Browse Map',
   'home.quick.viewStats': 'View Stats',
   'home.quick.uploadPhotos': 'Upload Photos',
+  'home.switchToLocal': 'Switch to local map',
+  'home.switchToGlobal': 'Switch to global globe',
+  'home.local': 'Local',
+  'home.global': 'Global',
 
   'theme.light': 'Light',
   'theme.dark': 'Dark',
