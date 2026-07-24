@@ -164,7 +164,8 @@ function onGlobeHover(code: string | null) {
 }
 
 // ── 飞行航线计算 ──
-function buildFlightRoutes(tripFilter?: (code: string) => boolean): FlightRoute[] {
+/** 国内航线（按 trip 所在国家过滤） */
+function buildDomesticRoutes(tripFilter?: (code: string) => boolean): FlightRoute[] {
   const all: FlightRoute[] = []
   let id = 0
   for (const trip of tripStore.recentTrips) {
@@ -182,7 +183,11 @@ function buildFlightRoutes(tripFilter?: (code: string) => boolean): FlightRoute[
       }
     }
   }
-  // 长距离 Demo 航线
+  return all
+}
+
+/** 国际航线（跨洲长距离） */
+function buildInternationalRoutes(): FlightRoute[] {
   const longHaul: { dep: string; arr: string; airline: string; no: string }[] = [
     { dep: 'PEK', arr: 'JFK', airline: 'Air China', no: 'CA981' },
     { dep: 'LHR', arr: 'NRT', airline: 'British Airways', no: 'BA005' },
@@ -190,6 +195,8 @@ function buildFlightRoutes(tripFilter?: (code: string) => boolean): FlightRoute[
     { dep: 'DXB', arr: 'JFK', airline: 'Emirates', no: 'EK201' },
     { dep: 'PEK', arr: 'LHR', airline: 'Air China', no: 'CA937' },
   ]
+  const all: FlightRoute[] = []
+  let id = 0
   for (const r of longHaul) {
     const dep = AIRPORT_COORDS[r.dep]
     const arr = AIRPORT_COORDS[r.arr]
@@ -200,10 +207,10 @@ function buildFlightRoutes(tripFilter?: (code: string) => boolean): FlightRoute[
   return all
 }
 
-const flightRoutes = computed<FlightRoute[]>(() => buildFlightRoutes())
+const internationalRoutes = computed<FlightRoute[]>(() => buildInternationalRoutes())
 const localFlightRoutes = computed<FlightRoute[]>(() => {
   if (!homeCountry.value) return []
-  return buildFlightRoutes(code => code === homeCountry.value.code)
+  return buildDomesticRoutes(code => code === homeCountry.value.code)
 })
 
 const flightPulseTrigger = ref(0)
@@ -267,7 +274,7 @@ onMounted(async () => {
           :country-statuses="allStatuses"
           :loading="false"
           :pulse-trigger="pulseTrigger"
-          :flight-routes="flightRoutes"
+          :flight-routes="internationalRoutes"
           :flight-pulse-trigger="flightPulseTrigger"
           class="globe-home__globe"
           @country-click="goToCountry"

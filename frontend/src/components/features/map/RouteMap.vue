@@ -69,31 +69,32 @@ function createTransportIcon(type: TransportType): L.DivIcon {
   })
 }
 
-/** 照片位置标记 — 相机图标风格 + 醒目配色 */
+/** 照片位置标记 — 相机 SVG 图标 + 醒目配色，size 随 zoom 变化 */
 function createPhotoMarker(
-  lat: number, lng: number, caption: string | undefined, isActive: boolean,
+  lat: number, lng: number, caption: string | undefined, isActive: boolean, size = 32,
 ): L.Marker {
-  const color = isActive ? '#E8714A' : '#bbb'
-  const opacity = isActive ? 1 : 0.3
-  const scale = isActive ? 1 : 0.7
+  const color = isActive ? '#E8714A' : '#999CA6'
+  const opacity = isActive ? 1 : 0.4
+  const scale = isActive ? 1 : 0.75
+  const iconSizePx = size
+  const svgSize = Math.round(size * 0.5)
 
   const icon = L.divIcon({
     className: 'photo-marker',
     html: `<div style="
-      width:28px;height:28px;
+      width:${iconSizePx}px;height:${iconSizePx}px;
       border-radius:50%;
       background:white;
-      border:2px solid ${color};
+      border:2.5px solid ${color};
       display:flex;align-items:center;justify-content:center;
-      font-size:13px;
-      box-shadow:0 2px 6px rgba(0,0,0,0.18);
+      box-shadow:0 2px 8px rgba(0,0,0,0.2);
       opacity:${opacity};
       transform:scale(${scale});
       transition:all 400ms var(--ease-spring);
       cursor:pointer;
-    ">📷</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    "><svg xmlns="http://www.w3.org/2000/svg" width="${svgSize}" height="${svgSize}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="2.5"/></svg></div>`,
+    iconSize: [iconSizePx, iconSizePx],
+    iconAnchor: [iconSizePx / 2, iconSizePx / 2],
   })
 
   const marker = L.marker([lat, lng], { icon })
@@ -103,7 +104,7 @@ function createPhotoMarker(
   return marker
 }
 
-function renderLayers() {
+function renderLayers(initial = false) {
   if (!map.value) return
 
   cityLayer?.clearLayers()
@@ -116,9 +117,14 @@ function renderLayers() {
   if (!iconLayer) iconLayer = L.layerGroup().addTo(map.value)
   if (!photoLayer) photoLayer = L.layerGroup().addTo(map.value)
 
+  // 标记大小随 zoom 变化: zoom 4→12px, zoom 8→21px, zoom 12→33px
+  const zoom = map.value.getZoom()
+  const citySize = Math.round(Math.max(10, Math.min(33, 1 + zoom * 2.5)))
+  const photoSize = Math.round(Math.max(22, Math.min(48, 8 + zoom * 3)))
+
   // --- City markers ---
   for (const city of props.cities) {
-    const m = createCityLabelMarker(city.lat, city.lng, city.name)
+    const m = createCityLabelMarker(city.lat, city.lng, city.name, { size: citySize })
     m.addTo(cityLayer)
     m.on('click', () => emit('city-click', city))
   }
@@ -148,18 +154,20 @@ function renderLayers() {
   // --- Photo location markers ---
   for (const photo of props.photoLocations) {
     const isActive = props.activeDay === -1 || photo.dayIndex === props.activeDay
-    const m = createPhotoMarker(photo.lat, photo.lng, photo.caption, isActive)
+    const m = createPhotoMarker(photo.lat, photo.lng, photo.caption, isActive, photoSize)
     m.addTo(photoLayer)
   }
 
-  // --- Fit bounds ---
-  const cityLatlngs = props.cities.map((c) => [c.lat, c.lng] as [number, number])
-  const photoLatlngs = props.photoLocations
-    .filter(p => props.activeDay === -1 || p.dayIndex === props.activeDay)
-    .map(p => [p.lat, p.lng] as [number, number])
-  const allLatlngs = [...cityLatlngs, ...photoLatlngs]
-  if (allLatlngs.length) {
-    fitToBounds(allLatlngs, 60)
+  // --- Fit bounds (initial only) ---
+  if (initial) {
+    const cityLatlngs = props.cities.map((c) => [c.lat, c.lng] as [number, number])
+    const photoLatlngs = props.photoLocations
+      .filter(p => props.activeDay === -1 || p.dayIndex === props.activeDay)
+      .map(p => [p.lat, p.lng] as [number, number])
+    const allLatlngs = [...cityLatlngs, ...photoLatlngs]
+    if (allLatlngs.length) {
+      fitToBounds(allLatlngs, 60)
+    }
   }
 }
 
@@ -171,8 +179,12 @@ onMounted(() => {
   try {
     init({ scrollWheelZoom: false })
     if (props.cities.length || props.photoLocations.length) {
-      renderLayers()
+      renderLayers(true)
     }
+    // zoom 变化时重算标记大小
+    map.value?.on('zoomend', () => {
+      if (props.cities.length || props.photoLocations.length) renderLayers()
+    })
     nextTick(() => ensureSize())
     setTimeout(() => ensureSize(), 300)
   } catch (e) {
@@ -256,5 +268,5 @@ watch(
   100% { background-position: -200% 0; }
 }
 
-:deep(.leaflet-marker-pane) { z-index: 5 !important; }
+/* marker pane uses default Leaflet z-index (600) — do NOT override it */
 </style>

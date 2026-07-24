@@ -1,8 +1,8 @@
 # Travel Atlas — 项目交接文档
 
-> **更新日期：** 2026-07-24
+> **更新日期：** 2026-07-25
 > **GitHub：** https://github.com/Stellan05/TripEarth.git
-> **最新提交：** `Phase 12 完成 — 本地模式、航线轨迹、Wishlist 详情、TripDetail 增强`
+> **最新提交：** `Phase 12 增强 — 航线分离、贝塞尔曲线弧、标记 zoom 响应、z-index 修复`
 
 ---
 
@@ -44,7 +44,7 @@
 - Hover 轮廓高亮 + 显示国名（台湾映射为 China）
 - 鼠标进入地球停止自转，离开恢复
 - **3D 飞行弧线**：点击统计面板「飞行次数」切换显示，0.7 弧高，Sunset Orange→Ocean Blue 渐变，虚线流动动画
-- **航线脉冲触发**：外部 `flightPulseTrigger` 控制弧线显隐
+- **仅国际航线**：显示跨洲长距离航线（PEK→JFK, LHR→NRT, LAX→SYD 等），国内航线仅在 Local 模式显示
 
 ### 2. GlobeHome 首页 (`pages/GlobeHome.vue`)
 
@@ -60,8 +60,9 @@
 - 右上角 ViewModeToggle 切换
 - **CountryHomeMap** 替换 Globe3D：Leaflet 全屏地图
 - 国家边界高亮（GeoJSON），含台湾
-- 显示本国城市标记（中国城市含坐标）
-- **本地飞行航线**：虚线 + 中点 ✈ 图标
+- 显示本国城市标记（中国城市含坐标），**标记大小随 zoom 缩放**
+- **本地飞行航线**：**贝塞尔曲线弧**（每条航线弧度不同）+ 虚线 + **起降端点标记**
+- 航线数据分离：**Globe3D 仅展示国际航线**，CountryHomeMap 仅展示国内航线
 - StatsPanel 适配（隐藏已去国家/收藏目的地）
 - NavPill 联动：「地球」↔「地图」
 
@@ -84,9 +85,11 @@
 
 - 全屏 Leaflet 地图组件
 - GeoJSON 国家边界高亮
-- 城市标记（visited 风格）
+- 城市标记（visited 风格），**20px 起，随 zoom 缩放（3→12px ~ 10→33px）**
 - 深色/浅色瓦片跟随主题
-- 飞行航线虚线层（toggle 显隐）
+- **飞行航线贝塞尔曲线弧**：每条航线弧度随机偏移（-0.20 ~ +0.30），虚线样式
+- **起降端点标记**：蓝色圆点，随 zoom 缩放
+- **航显 toggle**：统计面板「飞行次数」点击切换
 
 ### 6. CountryDetail (`pages/CountryDetail.vue`)
 
@@ -108,7 +111,7 @@
 - **FlightDetailModal**：Flighty 风格航班详情弹窗（预计/实际起降 + 机型 + 登机口 + 状态）
 - **DayTimelineStrip 增强**："All" 圆点 + 实心/空心区分内容 + dot-pop 动画
 - **按天筛选**：选中某天 → 地图高亮该天照片位置 + 照片网格过滤 + Notes 标签联动
-- **RouteMap 照片位置**：Apple 相册风格 📷 标记，活跃天脉冲高亮
+- **RouteMap 照片位置**：相机 SVG 图标标记（32px），随 zoom 缩放（22~48px），活跃天脉冲高亮
 - **添加手记**：All 模式为旅行总结，选中天为该天手记
 - **添加照片**：文件上传弹窗，自动填入当前日期
 
@@ -143,9 +146,9 @@
 |------|------|
 | `composables/useMap.ts` | Leaflet 生命周期（init/fitBounds/marker/polyline/destroy） |
 | `components/features/map/CountryMap.vue` | 国家页地图 |
-| `components/features/map/RouteMap.vue` | **增强版：照片位置标记 + 天筛选** |
-| `components/features/map/CountryHomeMap.vue` | **新增：本地模式全屏地图** |
-| `components/features/map/CityMarker.ts` | DivIcon 工厂 |
+| `components/features/map/RouteMap.vue` | **照片位置标记（SVG 相机图标）+ 天筛选 + zoom 响应** |
+| `components/features/map/CountryHomeMap.vue` | **本地全屏地图 + 贝塞尔航线弧 + 起降点 + zoom 响应** |
+| `components/features/map/CityMarker.ts` | DivIcon 工厂（支持 size 参数） |
 | `components/features/map/RouteLine.ts` | Polyline 工厂 |
 
 ### 新增 Molecule/Feature 组件
@@ -214,6 +217,13 @@ Forest Green:     #4A9C7C (收藏/想去)
 3. **深色主题巡检** — 新页面深色模式适配检查
 4. **Globe3D HMR 警告** — 开发模式下组件更新警告
 5. **照片上传** — 客户端压缩 + 上传进度
+
+### 已修复问题
+- 标记被瓦片遮挡不可见（`leaflet-marker-pane` z-index 错误覆盖 600→5）
+- 本地模式城市标记太小（12px→20px，随 zoom 缩放到 10~33px）
+- Detail 照片标记不可见（📷 emoji → SVG 相机图标，28px→32px，随 zoom 缩放到 22~48px）
+- 航线数据混用（分离为国际航线/国内航线，分别绑定 Globe3D / CountryHomeMap）
+- 国内航线直线→贝塞尔曲线弧（每条航线弧度不同）
 
 ### 后续功能（v0.2+）
 6. **统计面板** — 增强统计功能 / 图表

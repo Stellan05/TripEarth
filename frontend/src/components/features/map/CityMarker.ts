@@ -40,12 +40,13 @@ export function createCityLabelMarker(
   lat: number,
   lng: number,
   name: string,
-  options?: { color?: string; visited?: boolean },
+  options?: { color?: string; visited?: boolean; size?: number },
 ): L.Marker {
   const color = options?.color || (options?.visited ? '#E8714A' : '#4A9C7C')
+  const size = options?.size || 12
 
   const marker = L.marker([lat, lng], {
-    icon: createCityMarker({ color, pulse: false }),
+    icon: createCityMarker({ color, pulse: false, size }),
   })
 
   marker.bindTooltip(name, { direction: 'top', offset: L.point(0, -10) })

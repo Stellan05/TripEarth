@@ -50,11 +50,13 @@ const { map, containerRef, init, fitToBounds, destroy } = useMap()
 const internalLoading = ref(true)
 const stateError = ref<string | null>(null)
 const showLoading = computed(() => props.loading || internalLoading.value)
+const zoomLevel = ref(3)
 
 let cityLayer: L.LayerGroup | null = null
 let countryLayer: L.GeoJSON | null = null
 let flightLayer: L.LayerGroup | null = null
 let showFlights = false
+let lastRenderZoom = -1
 
 async function addCountryBorder(code: string) {
   if (!map.value) return
@@ -87,7 +89,9 @@ async function addCountryBorder(code: string) {
   } catch { /* ignore */ }
 }
 
-function renderCities() {
+function onZoomEnd() { zoomLevel.value = map.value?.getZoom() ?? 3 }
+
+function renderCities(initial = false) {
   if (!map.value) return
 
   if (cityLayer) {
@@ -99,14 +103,20 @@ function renderCities() {
   const cities = props.cities
   if (!cities.length) return
 
+  // 标记大小随 zoom 变化: zoom 3→12px, zoom 6→21px, zoom 10→33px
+  const zoom = map.value.getZoom()
+  const size = Math.round(Math.max(10, Math.min(33, 3 + zoom * 3)))
+
   for (const city of cities) {
-    const m = createCityLabelMarker(city.lat, city.lng, city.name, { visited: true })
+    const m = createCityLabelMarker(city.lat, city.lng, city.name, { visited: true, size })
     m.addTo(cityLayer)
     m.on('click', () => emit('city-click', city))
   }
 
-  const latlngs = cities.map((c) => [c.lat, c.lng] as [number, number])
-  fitToBounds(latlngs, 80)
+  if (initial) {
+    const latlngs = cities.map((c) => [c.lat, c.lng] as [number, number])
+    fitToBounds(latlngs, 80)
+  }
 }
 
 onMounted(() => {
@@ -123,8 +133,11 @@ onMounted(() => {
     }
 
     if (props.cities.length) {
-      renderCities()
+      renderCities(true)
     }
+
+    // zoom 变化时更新 ref → watch 驱动重渲染
+    map.value?.on('zoomend', onZoomEnd)
 
     // 确保过渡动画后重算地图尺寸
     nextTick(() => map.value?.invalidateSize())
@@ -170,44 +183,98 @@ watch(
 )
 
 // ── 飞行航线 ──
-function toggleFlights() {
-  if (!map.value) return
-  showFlights = !showFlights
+/**
+ * 生成贝塞尔曲线点：起始 → 控制点（中点法线偏移）→ 终点
+ * offsetRatio 控制弧度方向与大小，正值右偏、负值左偏
+ */
+function bezierPoints(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number,
+  offsetRatio: number,
+  steps = 40,
+): [number, number][] {
+  const midLat = (lat1 + lat2) / 2
+  const midLng = (lng1 + lng2) / 2
+  // 法线方向（垂直平分线）
+  const dx = lng2 - lng1
+  const dy = lat2 - lat1
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const nx = -dy / len
+  const ny = dx / len
+  // 控制点：法线偏移，偏移量正比于距离
+  const offset = len * offsetRatio
+  const cLat = midLat + nx * offset
+  const cLng = midLng + ny * offset
 
+  const pts: [number, number][] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const u = 1 - t
+    const lat = u * u * lat1 + 2 * u * t * cLat + t * t * lat2
+    const lng = u * u * lng1 + 2 * u * t * cLng + t * t * lng2
+    pts.push([lat, lng])
+  }
+  return pts
+}
+
+function renderFlights() {
+  const m = map.value
+  if (!m) return
+
+  // 移除旧 layer 和所有子元素
   if (flightLayer) {
-    flightLayer.clearLayers()
-    flightLayer.remove()
+    flightLayer.eachLayer(l => m.removeLayer(l))
+    m.removeLayer(flightLayer)
     flightLayer = null
   }
 
   if (!showFlights || !props.flightRoutes?.length) return
 
-  flightLayer = L.layerGroup().addTo(map.value)
-  for (const route of props.flightRoutes) {
-    const line = L.polyline(
-      [[route.startLat, route.startLng], [route.endLat, route.endLng]],
-      {
-        color: '#3B7EC7',
-        weight: 2.5,
-        opacity: 0.7,
-        dashArray: '6, 4',
-      },
-    ).addTo(flightLayer)
+  flightLayer = L.layerGroup().addTo(m)
+  const zoom = m.getZoom()
+  const lineWeight = Math.max(1.5, Math.min(3.5, 0.5 + zoom * 0.25))
 
-    // 中点标注
-    const midLat = (route.startLat + route.endLat) / 2
-    const midLng = (route.startLng + route.endLng) / 2
-    L.marker([midLat, midLng], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="width:20px;height:20px;border-radius:50%;background:white;border:2px solid #3B7EC7;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 4px rgba(0,0,0,0.2);">✈</div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      }),
-      interactive: false,
+  for (const route of props.flightRoutes) {
+    // 每条航线不同弧度：基于 id 取 -0.25 ~ +0.30 之间的值
+    const offsetRatio = 0.05 + ((route.id * 137.5) % 0.5) - 0.25
+    const pts = bezierPoints(route.startLat, route.startLng, route.endLat, route.endLng, offsetRatio)
+
+    L.polyline(pts, {
+      color: '#3B7EC7',
+      weight: lineWeight,
+      opacity: 0.7,
+      dashArray: '6, 4',
     }).addTo(flightLayer)
+
+    // 机场起降点标记
+    const airportSize = Math.max(6, Math.min(14, 2 + zoom * 1.2))
+    const airportIcon = L.divIcon({
+      className: '',
+      html: `<div style="width:${airportSize}px;height:${airportSize}px;border-radius:50%;background:#3B7EC7;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [airportSize, airportSize],
+      iconAnchor: [airportSize / 2, airportSize / 2],
+    })
+    L.marker([route.startLat, route.startLng], { icon: airportIcon, interactive: false }).addTo(flightLayer)
+    L.marker([route.endLat, route.endLng], { icon: airportIcon, interactive: false }).addTo(flightLayer)
   }
 }
+
+function toggleFlights() {
+  if (!map.value) return
+  showFlights = !showFlights
+  renderFlights()
+  lastRenderZoom = map.value.getZoom()
+}
+
+// zoom 变化时重算标记大小
+watch(zoomLevel, () => {
+  if (!map.value) return
+  if (props.cities.length) renderCities()
+  if (showFlights && map.value.getZoom() !== lastRenderZoom) {
+    renderFlights()
+    lastRenderZoom = map.value.getZoom()
+  }
+})
 
 watch(() => props.flightPulseTrigger, () => {
   toggleFlights()
@@ -216,6 +283,7 @@ watch(() => props.flightPulseTrigger, () => {
 onBeforeUnmount(() => {
   if (countryLayer) countryLayer.remove()
   if (flightLayer) flightLayer.remove()
+  if (map.value) map.value.off('zoomend', onZoomEnd)
   destroy()
 })
 </script>
@@ -252,7 +320,7 @@ onBeforeUnmount(() => {
 .country-home-map__container {
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: var(--color-page, #f5f2ed);
 }
 
 :deep(.leaflet-container) {
@@ -292,6 +360,5 @@ onBeforeUnmount(() => {
   100% { background-position: -200% 0; }
 }
 
-:deep(.leaflet-marker-pane) { z-index: 5 !important; }
 :deep(.leaflet-control-zoom) { display: none; }
 </style>
